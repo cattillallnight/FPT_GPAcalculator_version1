@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FPT GPA Calculator</title>
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: linear-gradient(135deg, #f97316, #ffcc70);
+      color: #333;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    h1 {
+      margin-top: 40px;
+      font-size: 2.5em;
+      color: #fff;
+      text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+    }
+    .mode-select {
+      display: flex;
+      gap: 15px;
+      margin-top: 20px;
+    }
+    .mode-select button {
+      background-color: #fff;
+      color: #f97316;
+      border: 2px solid #f97316;
+      padding: 10px 20px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: 0.3s;
+    }
+    .mode-select button:hover {
+      background-color: #f97316;
+      color: #fff;
+    }
+    .container {
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+      padding: 30px;
+      width: 90%;
+      max-width: 700px;
+      margin-top: 30px;
+      display: none;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+    th, td {
+      border-bottom: 1px solid #ddd;
+      text-align: center;
+      padding: 8px;
+    }
+    th {
+      background-color: #f97316;
+      color: white;
+    }
+    input[type="text"], input[type="number"], textarea {
+      width: 90%;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    textarea {
+      width: 100%;
+      resize: vertical;
+    }
+    button.calc-btn {
+      background-color: #f97316;
+      border: none;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: 0.3s;
+    }
+    button.calc-btn:hover {
+      background-color: #fb923c;
+    }
+    #result, #result2 {
+      text-align: center;
+      margin-top: 15px;
+      font-size: 1.1em;
+    }
+    .footer {
+      margin-top: 40px;
+      font-size: 0.9em;
+      color: #fff;
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎓 FPT GPA Calculator</h1>
+  <div class="mode-select">
+    <button onclick="showMode('manual')">Manual Input Mode</button>
+    <button onclick="showMode('paste')">Paste Transcript Mode</button>
+  </div>
+
+  <!-- Manual Mode -->
+  <div class="container" id="manual">
+    <p><strong>Note:</strong> Courses starting with ENT, VOV, GDQP, or OJT are excluded automatically.</p>
+    <table id="courseTable">
+      <thead>
+        <tr>
+          <th>Course Name</th>
+          <th>Credits</th>
+          <th>Grade (10-scale)</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><input type="text" placeholder="Ex: PRF192"></td>
+          <td><input type="number" value="3" min="1"></td>
+          <td><input type="number" step="0.1" min="0" max="10"></td>
+          <td><button onclick="deleteRow(this)">❌</button></td>
+        </tr>
+      </tbody>
+    </table>
+    <button onclick="addRow()">➕ Add Course</button>
+    <button class="calc-btn" onclick="calculateGPA()">📊 Calculate GPA</button>
+    <div id="result"></div>
+  </div>
+
+  <!-- Paste Mode -->
+  <div class="container" id="paste">
+    <p><strong>Format:</strong> Semester:Course:Credit:Grade:Status<br>Only Passed courses will be counted. ENT, VOV, GDQP, and OJT are excluded automatically.</p>
+    <textarea id="transcriptInput" rows="10" placeholder="Example:\nFall2025:IOT102:3:9.1:Passed\nSummer2025:CSD201:3:8.6:Passed\nSummer2025:MAS291:3:Studying"></textarea>
+    <label><strong>Conditional Courses (separate by commas):</strong></label>
+    <input type="text" id="conditionalCourses" placeholder="Example: MAS291, LAB211">
+    <button class="calc-btn" onclick="calculateGPAPaste()">📊 Calculate GPA</button>
+    <div id="result2"></div>
+  </div>
+
+  <div class="footer">made by <strong>cattillallnight</strong></div>
+
+  <script>
+    function showMode(mode) {
+      document.getElementById('manual').style.display = mode === 'manual' ? 'block' : 'none';
+      document.getElementById('paste').style.display = mode === 'paste' ? 'block' : 'none';
+    }
+
+    function addRow() {
+      const table = document.getElementById('courseTable').getElementsByTagName('tbody')[0];
+      const newRow = table.insertRow();
+      newRow.innerHTML = `
+        <td><input type="text" placeholder="Ex: PRO192"></td>
+        <td><input type="number" value="3" min="1"></td>
+        <td><input type="number" step="0.1" min="0" max="10"></td>
+        <td><button onclick="deleteRow(this)">❌</button></td>
+      `;
+    }
+
+    function deleteRow(button) {
+      const row = button.parentNode.parentNode;
+      row.remove();
+    }
+
+    function calculateGPA() {
+      const rows = document.querySelectorAll('#courseTable tbody tr');
+      let totalCredits = 0;
+      let totalWeighted = 0;
+      let excludedCourses = [];
+
+      rows.forEach(row => {
+        const course = row.cells[0].querySelector('input').value.trim().toUpperCase();
+        const credits = parseFloat(row.cells[1].querySelector('input').value) || 0;
+        const grade = parseFloat(row.cells[2].querySelector('input').value) || 0;
+
+        if (/^(ENT|VOV|GDQP|OJT)/.test(course)) {
+          excludedCourses.push(course);
+          return;
+        }
+
+        totalCredits += credits;
+        totalWeighted += credits * grade;
+      });
+
+      if (totalCredits === 0) {
+        document.getElementById('result').innerHTML = '<span style="color:red">Please enter valid data!</span>';
+        return;
+      }
+
+      const gpa10 = (totalWeighted / totalCredits).toFixed(2);
+      const gpa4 = convertTo4Scale(gpa10);
+      const classification = getClassification(gpa10);
+
+      let output = `
+        <strong>GPA (10-scale):</strong> ${gpa10} / 10<br>
+        <strong>GPA (4-scale):</strong> ${gpa4} / 4.0<br>
+        <strong>Classification:</strong> ${classification}
+      `;
+
+      if (excludedCourses.length > 0) {
+        output += `<br><em>Excluded courses:</em> ${excludedCourses.join(', ')}`;
+      }
+
+      document.getElementById('result').innerHTML = output;
+    }
+
+    function calculateGPAPaste() {
+      const transcript = document.getElementById('transcriptInput').value.trim();
+      const conditionalInput = document.getElementById('conditionalCourses').value.trim();
+      const conditionalList = conditionalInput ? conditionalInput.split(',').map(c => c.trim().toUpperCase()) : [];
+
+      if (!transcript) {
+        document.getElementById('result2').innerHTML = '<span style="color:red">Please paste your transcript!</span>';
+        return;
+      }
+
+      const lines = transcript.split(/\n|\r/).filter(line => line.trim() !== '');
+      let totalCredits = 0;
+      let totalWeighted = 0;
+      let excludedCourses = [];
+
+      lines.forEach(line => {
+        const parts = line.split(':').map(p => p.trim());
+        if (parts.length < 5) return;
+
+        const course = parts[1].toUpperCase();
+        const credits = parseFloat(parts[2]) || 0;
+        const grade = parseFloat(parts[3]) || 0;
+        const status = parts[4].toLowerCase();
+
+        if (status !== 'passed') return;
+        if (/^(ENT|VOV|GDQP|OJT)/.test(course) || conditionalList.includes(course)) {
+          excludedCourses.push(course);
+          return;
+        }
+
+        totalCredits += credits;
+        totalWeighted += credits * grade;
+      });
+
+      if (totalCredits === 0) {
+        document.getElementById('result2').innerHTML = '<span style="color:red">No valid Passed courses found!</span>';
+        return;
+      }
+
+      const gpa10 = (totalWeighted / totalCredits).toFixed(2);
+      const gpa4 = convertTo4Scale(gpa10);
+      const classification = getClassification(gpa10);
+
+      let output = `
+        <strong>GPA (10-scale):</strong> ${gpa10} / 10<br>
+        <strong>GPA (4-scale):</strong> ${gpa4} / 4.0<br>
+        <strong>Classification:</strong> ${classification}
+      `;
+
+      if (excludedCourses.length > 0) {
+        output += `<br><em>Excluded courses:</em> ${excludedCourses.join(', ')}`;
+      }
+
+      document.getElementById('result2').innerHTML = output;
+    }
+
+    function convertTo4Scale(gpa10) {
+      gpa10 = parseFloat(gpa10);
+      if (gpa10 >= 9.0) return 4.0;
+      if (gpa10 >= 8.5) return 3.75;
+      if (gpa10 >= 8.0) return 3.5;
+      if (gpa10 >= 7.5) return 3.25;
+      if (gpa10 >= 7.0) return 3.0;
+      if (gpa10 >= 6.5) return 2.75;
+      if (gpa10 >= 6.0) return 2.5;
+      if (gpa10 >= 5.5) return 2.25;
+      if (gpa10 >= 5.0) return 2.0;
+      return 0.0;
+    }
+
+    function getClassification(gpa10) {
+      if (gpa10 >= 9.0) return 'Excellent (A+)';
+      if (gpa10 >= 8.5) return 'Very Good (A)';
+      if (gpa10 >= 8.0) return 'Good (A-)';
+      if (gpa10 >= 7.0) return 'Fair (B)';
+      if (gpa10 >= 5.0) return 'Average (C)';
+      return 'Fail (F)';
+    }
+  </script>
+</body>
+</html>
